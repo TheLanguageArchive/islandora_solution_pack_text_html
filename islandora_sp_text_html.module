@@ -73,7 +73,10 @@ function islandora_sp_text_html_islandora_sp_text_html_islandora_view_object($ob
     $datastream = $filteredContent = $object->getDatastream('OBJ');
 
     if ($datastream->mimetype === 'text/html') {
-        $filteredContent = check_markup($datastream->content, 'filtered_html');
+        $content = $datastream->content;
+        // since drupal filtered_html does not filter text between style tags, we'll do that first
+        $filteredContent = preg_replace('@<style[^>]*?>.*?</style>@siu', '', $content);
+        $filteredContent = check_markup($filteredContent, 'filtered_html');
     } elseif ($datastream->mimetype === 'text/plain') {
         $filteredContent = check_markup($datastream->content, 'plain_text');
     } else {
