@@ -6,5 +6,5 @@
  */
 ?>
 <div class="islandora-sp-text-html islandora" vocab="http://schema.org/" prefix="dcterms: http://purl.org/dc/terms/" typeof="TEXTHTMLOBJECT">
-    <?php echo $content; ?>
+    <?php echo $islandora_content; ?>
 </div>

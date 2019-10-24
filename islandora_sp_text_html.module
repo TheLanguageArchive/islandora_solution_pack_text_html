@@ -11,8 +11,8 @@
 function islandora_sp_text_html_theme($existing, $type, $theme, $path) {
 
     return [
-        'islandora_sp_text_html_view' => [
-            'template' => 'theme/islandora-sp-text-html-view',
+        'islandora_sp_text_html' => [
+            'template' => 'theme/islandora-sp-text-html',
         ],
     ];
 }
@@ -66,26 +66,67 @@ function islandora_sp_text_html_islandora_required_objects(IslandoraTuque $conne
 }
 
 /**
-* Implements hook_CMODEL_PID_islandora_view_object().
-*/
+ * Implements hook_CMODEL_PID_islandora_view_object().
+ */
 function islandora_sp_text_html_islandora_sp_text_html_islandora_view_object($object, $page_number, $page_size) {
+  $output = theme('islandora_sp_text_html', array('islandora_object' => $object));
+  return array('' => $output);
+}
 
-    $datastream = $filteredContent = $object->getDatastream('OBJ');
+/**
+ * Implements hook_preprocess_theme().
+ */
+function template_preprocess_islandora_sp_text_html(array &$variables) {
+  drupal_add_js('misc/form.js');
+  drupal_add_js('misc/collapse.js');
+  $islandora_object = $variables['islandora_object'];
+  $repository = $islandora_object->repository;
+  module_load_include('inc', 'islandora', 'includes/datastream');
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  module_load_include('inc', 'islandora', 'includes/metadata');
+
+  // We should eventually remove the DC object and dc_array code as it only
+  // exists to not break legacy implementations.
+  if (islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $islandora_object['DC'])) {
+    try {
+      $dc = $islandora_object['DC']->content;
+      $dc_object = DublinCore::importFromXMLString($dc);
+    }
+    catch (Exception $e) {
+      drupal_set_message(t('Error retrieving object %s %t', array('%s' => $islandora_object->id, '%t' => $e->getMessage())), 'error', FALSE);
+    }
+  }
+  $variables['islandora_dublin_core'] = isset($dc_object) ? $dc_object : NULL;
+  $variables['dc_array'] = isset($dc_object) ? $dc_object->asArray() : array();
+  $variables['islandora_object_label'] = $islandora_object->label;
+  $variables['theme_hook_suggestions'][] = 'islandora_sp_text_html__' . str_replace(':', '_', $islandora_object->id);
+  $variables['parent_collections'] = islandora_get_parents_from_rels_ext($islandora_object);
+  $variables['metadata'] = islandora_retrieve_metadata_markup($islandora_object);
+  $variables['description'] = islandora_retrieve_description_markup($islandora_object);
+  global $user;
+  // Text/HTML object.
+  if (isset($islandora_object['OBJ']) && islandora_datastream_access(ISLANDORA_VIEW_OBJECTS, $islandora_object['OBJ'], $user)) {
+
+    $datastream = $filteredContent = $islandora_object->getDatastream('OBJ');
 
     if ($datastream->mimetype === 'text/html') {
         $content = $datastream->content;
         // since drupal filtered_html does not filter text between style tags, we'll do that first
         $filteredContent = preg_replace('@<style[^>]*?>.*?</style>@siu', '', $content);
         $filteredContent = check_markup($filteredContent, 'filtered_html');
-    } elseif ($datastream->mimetype === 'text/plain') {
+        $filteredContent = '<div class="filtered-html">' . $filteredContent . '</div>';
+    } elseif (in_array($datastream->mimetype,  array('text/plain', 'text/x-chat', 'text/praat-script', 'text/r-script', 'text/x-R', 'text/x-esf', 'text/x-matlab', 'text/x-presentation-script', 'text/x-presentation-template', 'text/x-python', 'text/x-shoebox-language', 'text/x-shoebox-lexicon', 'text/x-shoebox-text', 'text/x-shoebox-type', 'text/x-toolbox-lexicon', 'text/x-toolbox-text'))) {
         $filteredContent = check_markup($datastream->content, 'plain_text');
+        // strip br tags, "white-space: pre-wrap" css already preserves line breaks and we don't want them twice
+        $filteredContent = preg_replace("~<br />~", "", $filteredContent);
+        $filteredContent = '<div class="plain-text">' . $filteredContent . '</div>';
     } else {
         $filteredContent = '';
     }
 
-    return theme('islandora_sp_text_html_view', [
-        'content' => $filteredContent,
-    ]);
+    $variables['islandora_content'] = $filteredContent;
+    
+  }
 }
 
 function islandora_sp_text_html_islandora_sp_text_html_islandora_ingest_steps() {
