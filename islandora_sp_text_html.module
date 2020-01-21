@@ -110,22 +110,29 @@ function template_preprocess_islandora_sp_text_html(array &$variables) {
     $datastream = $filteredContent = $islandora_object->getDatastream('OBJ');
 
     if ($datastream->mimetype === 'text/html') {
+
         $content = $datastream->content;
+
         // since drupal filtered_html does not filter text between style tags, we'll do that first
         $filteredContent = preg_replace('@<style[^>]*?>.*?</style>@siu', '', $content);
         $filteredContent = check_markup($filteredContent, 'filtered_html');
         $filteredContent = '<div class="filtered-html">' . $filteredContent . '</div>';
+
     } elseif (in_array($datastream->mimetype,  array('text/plain', 'text/x-chat', 'text/praat-script', 'text/r-script', 'text/x-R', 'text/x-esf', 'text/x-matlab', 'text/x-presentation-script', 'text/x-presentation-template', 'text/x-python', 'text/x-shoebox-language', 'text/x-shoebox-lexicon', 'text/x-shoebox-text', 'text/x-shoebox-type', 'text/x-toolbox-lexicon', 'text/x-toolbox-text'))) {
+
         $filteredContent = check_markup($datastream->content, 'plain_text');
         // strip br tags, "white-space: pre-wrap" css already preserves line breaks and we don't want them twice
         $filteredContent = preg_replace("~<br />~", "", $filteredContent);
         $filteredContent = '<div class="plain-text">' . $filteredContent . '</div>';
+
     } else {
         $filteredContent = '';
     }
 
+    // removing mailto links
+    $filteredContent = preg_replace('/\<a href="mailto:.+"\>(.+)\<\/a\>/ims', '$1', $filteredContent);
+
     $variables['islandora_content'] = $filteredContent;
-    
   }
 }
 
